@@ -1,0 +1,57 @@
+# Stamps /etc/rfcdefaults/socprovisioning.ini with product-layer values
+# at image assembly time (ROOTFS_POSTPROCESS_COMMAND).
+#
+# Field values should be configured in product layers via BitBake variables:
+#   SocProvisioningActivation, SocProvisioningRenewal,
+#   SocProvisioningNameSpaceUri, SocProvisioningNameSpacePrefix,
+#   SocProvisioningAuthMessage, SocProvisioningdisableCredentialsPrefetchCaching,
+#   SocProvisioningbackoffIntervalMax
+
+python create_socprovisioning_config() {
+    import os
+
+    fields = {
+        "SocProvisioning.Activation": d.getVar("SocProvisioningActivation", True),
+        "SocProvisioning.Renewal": d.getVar("SocProvisioningRenewal", True),
+        "SocProvisioning.NameSpaceUri": d.getVar("SocProvisioningNameSpaceUri", True),
+        "SocProvisioning.NameSpacePrefix": d.getVar("SocProvisioningNameSpacePrefix", True),
+        "SocProvisioning.AuthMessage": d.getVar("SocProvisioningAuthMessage", True),
+        "SocProvisioning.disableCredentialsPrefetchCaching":
+            d.getVar("SocProvisioningdisableCredentialsPrefetchCaching", True),
+        "SocProvisioning.backoffIntervalMax":
+            d.getVar("SocProvisioningbackoffIntervalMax", True),
+    }
+
+    # Only proceed if at least one URL is defined
+    has_urls = any(fields.get(k) for k in [
+        "SocProvisioning.Activation", "SocProvisioning.Renewal"])
+    if not has_urls:
+        bb.note("No SocProvisioning URLs defined in product layer - "
+                "device will use middleware defaults")
+        return
+
+    rootfs = d.getVar("IMAGE_ROOTFS", True)
+    ini_path = os.path.join(rootfs, "etc", "rfcdefaults", "socprovisioning.ini")
+
+    if not os.path.exists(ini_path):
+        bb.warn("socprovisioning.ini not found at %s - skipping" % ini_path)
+        return
+
+    # Read existing INI, replace values where product layer defines them
+    with open(ini_path, "r") as f:
+        lines = f.readlines()
+
+    with open(ini_path, "w") as f:
+        for line in lines:
+            replaced = False
+            for field, value in fields.items():
+                prefix = "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.%s=" % field
+                if value and line.startswith(prefix):
+                    f.write("%s%s\n" % (prefix, value))
+                    replaced = True
+                    break
+            if not replaced:
+                f.write(line)
+}
+create_socprovisioning_config[vardepsexclude] += "DATETIME"
+ROOTFS_POSTPROCESS_COMMAND += 'create_socprovisioning_config; '
