@@ -38,10 +38,10 @@ python create_socprovisioning_config() {
         return
 
     # Read existing INI, replace values where product layer defines them
-    with open(ini_path, "r") as f:
+    with open(ini_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    with open(ini_path, "w") as f:
+    with open(ini_path, "w", encoding="utf-8") as f:
         for line in lines:
             replaced = False
             for field, value in fields.items():
@@ -52,6 +52,7 @@ python create_socprovisioning_config() {
                     break
             if not replaced:
                 f.write(line)
+    os.chmod(ini_path, 0o644)
 }
 create_socprovisioning_config[vardepsexclude] += "DATETIME"
 ROOTFS_POSTPROCESS_COMMAND += 'create_socprovisioning_config; '
